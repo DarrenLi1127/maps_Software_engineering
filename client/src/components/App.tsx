@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import "../styles/App.css";
 import MapsGearup from "./MapsGearup";
+import { useEffect } from "react";
 import {
   SignedIn,
   SignedOut,
@@ -8,6 +9,7 @@ import {
   SignOutButton,
   UserButton,
 } from "@clerk/clerk-react";
+import { loadPinsFromStorage } from "./pinType";
 
 // REMEMBER TO PUT YOUR API KEY IN A FOLDER THAT IS GITIGNORED!!
 // (for instance, /src/private/api_key.tsx)
@@ -25,35 +27,58 @@ const firebaseConfig = {
 initializeApp(firebaseConfig);
 
 function App() {
+  // Load pins from localStorage on app initialization
+  useEffect(() => {
+    loadPinsFromStorage();
+  }, []);
+
   return (
-    <div className="App">
-      <SignedOut>
-        <SignInButton />
-      </SignedOut>
-      <SignedIn>
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              justifyContent: "center",
-              alignContent: "center",
-              padding: "10px",
-              gap: "10px",
-            }}
-          >
-            <SignOutButton />
-            <UserButton />
+      <div className="App">
+        {/* @ts-ignore - Clerk component typing issue */}
+        <SignedOut>
+          <div className="sign-in-container">
+            <h1>Redlining Map Visualization</h1>
+            <p>Please sign in to view and interact with the map</p>
+            <SignInButton mode="modal" />
           </div>
-          <MapsGearup />
-        </div>
-      </SignedIn>
-    </div>
+        </SignedOut>
+
+        {/* @ts-ignore - Clerk component typing issue */}
+        <SignedIn>
+          <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                height: "100vh",
+              }}
+          >
+            <div
+                style={{
+                  display: "flex",
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "10px 20px",
+                  backgroundColor: "#f0f2f5",
+                  borderBottom: "1px solid #ddd",
+                }}
+            >
+              <h2 style={{ margin: 0 }}>Redlining Map</h2>
+              <div
+                  style={{
+                    display: "flex",
+                    gap: "10px",
+                    alignItems: "center",
+                  }}
+              >
+                <UserButton />
+                <SignOutButton />
+              </div>
+            </div>
+            <MapsGearup />
+          </div>
+        </SignedIn>
+      </div>
   );
 }
 

@@ -1,26 +1,21 @@
-import { useState } from "react";
-import FirestoreDemo from "./FirestoreDemo";
 import Mapbox from "./Mapbox";
-
-enum Section {
-  FIRESTORE_DEMO = "FIRESTORE_DEMO",
-  MAP_DEMO = "MAP_DEMO",
-}
+import "../styles/Map.css";
+import { useUser } from "@clerk/clerk-react";
 
 export default function MapsGearup() {
-  const [section, setSection] = useState<Section>(Section.FIRESTORE_DEMO);
+  const { user } = useUser();
 
   return (
-    <div>
-      <h1 aria-label="Gearup Title">Maps Gearup</h1>
-      <button onClick={() => setSection(Section.FIRESTORE_DEMO)}>
-        Section 1: Firestore Demo
-      </button>
-      <button onClick={() => setSection(Section.MAP_DEMO)}>
-        Section 2: Mapbox Demo
-      </button>
-      {section === Section.FIRESTORE_DEMO ? <FirestoreDemo /> : null}
-      {section === Section.MAP_DEMO ? <Mapbox /> : null}
-    </div>
+      <div className="maps-gearup">
+        <header className="maps-header">
+          <h1 aria-label="Map Title">Redlining Map</h1>
+          {user && (
+              <p className="user-welcome">
+                Welcome, {user.firstName || "User"}! Click on the map to add a pin.
+              </p>
+          )}
+        </header>
+        <Mapbox />
+      </div>
   );
 }

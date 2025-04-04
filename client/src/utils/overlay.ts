@@ -23,20 +23,12 @@ export const geoLayer: FillLayer = {
   },
 };
 
-// TODO: MAPS PART 4:
-// - Download and import the geojson file
-// - Implement the two functions below.
-
-// Import the raw JSON file
-// import rl_data from "../geodata/fullDownload.json";
-// you may need to rename the downloaded .geojson to .json
+import rl_data from "../geodata/fullDownload.json";
 
 function isFeatureCollection(json: any): json is FeatureCollection {
-  // ...
-  return false;
+  return json.type === "FeatureCollection";
 }
 
 export function overlayData(): GeoJSON.FeatureCollection | undefined {
-  // ....
-  return undefined;
+  return isFeatureCollection(rl_data) ? rl_data : undefined;
 }

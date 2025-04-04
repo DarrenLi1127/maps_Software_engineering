@@ -12,3 +12,47 @@
   font-size: calc(1px + 2vmin);
   color: white;
 }
+
+.App {
+  text-align: center;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.sign-in-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background-color: #f0f2f5;
+}
+
+.sign-in-container h1 {
+  margin-bottom: 10px;
+  color: #1e2940;
+}
+
+.sign-in-container p {
+  margin-bottom: 30px;
+  color: #5c6b7f;
+}
+
+.maps-header {
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #e1e4e8;
+}
+
+.maps-header h1 {
+  margin: 0;
+  font-size: 24px;
+  color: #24292e;
+}
+
+.user-welcome {
+  margin: 10px 0 0;
+  font-size: 16px;
+  color: #586069;
+}
