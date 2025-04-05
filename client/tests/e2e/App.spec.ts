@@ -429,7 +429,7 @@ test("Pins are rendered with correct styling and classes", async ({ page }) => {
   const pin = page.locator(".map-pin").first();
   await expect(pin).toBeVisible();
 
-  // Verify the pin has the correct class (should be "my-pin" since we created it)
+  // Verify the pin has the correct class
   await expect(pin).toHaveClass(/my-pin/);
 
   // Verify the pin contains the emoji character
@@ -440,7 +440,6 @@ test("Pins are rendered with correct styling and classes", async ({ page }) => {
   const ariaLabel = await pin.getAttribute("aria-label");
   expect(ariaLabel).toMatch(/Pin at latitude \d+\.\d+, longitude -\d+\.\d+/);
 
-  // Instead of clicking the pin (which is problematic), let's programmatically
   // trigger the popup by using page.evaluate()
   await page.evaluate(() => {
     // Get the first pin marker
@@ -458,7 +457,7 @@ test("Pins are rendered with correct styling and classes", async ({ page }) => {
 
   await page.waitForTimeout(500);
 
-  // Verify if popup appears (without asserting, as it might be unreliable)
+  // Verify if popup appears
   const popupExists = await page.locator('.mapboxgl-popup').count() > 0;
 
   if (popupExists) {
@@ -475,7 +474,6 @@ test("Pins are rendered with correct styling and classes", async ({ page }) => {
     console.log("Popup wasn't displayed - this is a known limitation with MapBox testing");
   }
 
-  // Clean up
   await page.locator("button:has-text('Clear My Pins')").click();
 });
 
