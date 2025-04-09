@@ -2,9 +2,9 @@ package edu.brown.cs.student.main.server;
 
 import static spark.Spark.after;
 
-import edu.brown.cs.student.main.server.handlers.AddWordHandler;
-import edu.brown.cs.student.main.server.handlers.ClearUserHandler;
-import edu.brown.cs.student.main.server.handlers.ListWordsHandler;
+import edu.brown.cs.student.main.server.handlers.AddPinHandler;
+import edu.brown.cs.student.main.server.handlers.ClearPinsHandler;
+import edu.brown.cs.student.main.server.handlers.ListPinsHandler;
 import edu.brown.cs.student.main.server.storage.FirebaseUtilities;
 import edu.brown.cs.student.main.server.storage.StorageInterface;
 import java.io.IOException;
@@ -29,14 +29,15 @@ public class Server {
     try {
       firebaseUtils = new FirebaseUtilities();
 
-      Spark.get("add-word", new AddWordHandler(firebaseUtils));
-      Spark.get("list-words", new ListWordsHandler(firebaseUtils));
-      Spark.get("clear-user", new ClearUserHandler(firebaseUtils));
+      // New endpoints for pin management
+      Spark.get("add-pin", new AddPinHandler(firebaseUtils));
+      Spark.get("list-pins", new ListPinsHandler(firebaseUtils));
+      Spark.get("clear-pins", new ClearPinsHandler(firebaseUtils));
 
       Spark.notFound(
           (request, response) -> {
             response.status(404); // Not Found
-            System.out.println("ERROR");
+            System.out.println("ERROR: 404 - " + request.pathInfo());
             return "404 Not Found - The requested endpoint does not exist.";
           });
       Spark.init();

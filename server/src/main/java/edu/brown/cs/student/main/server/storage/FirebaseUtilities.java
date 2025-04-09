@@ -22,24 +22,28 @@ import java.util.concurrent.ExecutionException;
 public class FirebaseUtilities implements StorageInterface {
 
   public FirebaseUtilities() throws IOException {
-    // TODO: FIRESTORE PART 0:
     // Create /resources/ folder with firebase_config.json and
-    // add your admin SDK from Firebase. see:
-    // https://docs.google.com/document/d/10HuDtBWjkUoCaVj_A53IFm5torB_ws06fW3KYFZqKjc/edit?usp=sharing
+    // add your admin SDK from Firebase.
     String workingDirectory = System.getProperty("user.dir");
     Path firebaseConfigPath =
         Paths.get(workingDirectory, "src", "main", "resources", "firebase_config.json");
-    // ^-- if your /resources/firebase_config.json exists but is not found,
-    // try printing workingDirectory and messing around with this path.
 
     FileInputStream serviceAccount = new FileInputStream(firebaseConfigPath.toString());
+    GoogleCredentials credentials = GoogleCredentials.fromStream(serviceAccount);
 
     FirebaseOptions options =
         new FirebaseOptions.Builder()
-            .setCredentials(GoogleCredentials.fromStream(serviceAccount))
+            .setCredentials(credentials)
+            .setProjectId("maps-hli284")
+            .setDatabaseUrl("https://maps-hli284.firebaseio.com")
             .build();
 
-    FirebaseApp.initializeApp(options);
+    // Initialize Firebase if it's not already initialized
+    if (FirebaseApp.getApps().isEmpty()) {
+      FirebaseApp.initializeApp(options);
+    } else {
+      FirebaseApp.getInstance();
+    }
   }
 
   @Override
@@ -52,13 +56,13 @@ public class FirebaseUtilities implements StorageInterface {
     // gets all documents in the collection 'collection_id' for user 'uid'
 
     Firestore db = FirestoreClient.getFirestore();
-    // 1: Make the data payload to add to your collection
+    // Make the data payload to add to your collection
     CollectionReference dataRef = db.collection("users").document(uid).collection(collection_id);
 
-    // 2: Get pin documents
+    // Get pin documents
     QuerySnapshot dataQuery = dataRef.get().get();
 
-    // 3: Get data from document queries
+    // Get data from document queries
     List<Map<String, Object>> data = new ArrayList<>();
     for (QueryDocumentSnapshot doc : dataQuery.getDocuments()) {
       data.add(doc.getData());
@@ -74,18 +78,18 @@ public class FirebaseUtilities implements StorageInterface {
       throw new IllegalArgumentException(
           "addDocument: uid, collection_id, doc_id, or data cannot be null");
     }
-    // adds a new document 'doc_name' to colleciton 'collection_id' for user 'uid'
+    // adds a new document 'doc_id' to collection 'collection_id' for user 'uid'
     // with data payload 'data'.
 
-    // TODO: FIRESTORE PART 1:
-    // use the guide below to implement this handler
-    // - https://firebase.google.com/docs/firestore/quickstart#add_data
-
     Firestore db = FirestoreClient.getFirestore();
-    // 1: Get a ref to the collection that you created
 
-    // 2: Write data to the collection ref
+    // Get a reference to the collection
+    CollectionReference collectionRef =
+        db.collection("users").document(uid).collection(collection_id);
 
+    // Write data to the collection with the specified document ID
+    DocumentReference docRef = collectionRef.document(doc_id);
+    docRef.set(data);
   }
 
   // clears the collections inside of a specific user.
@@ -97,9 +101,9 @@ public class FirebaseUtilities implements StorageInterface {
     try {
       // removes all data for user 'uid'
       Firestore db = FirestoreClient.getFirestore();
-      // 1: Get a ref to the user document
+      // Get a ref to the user document
       DocumentReference userDoc = db.collection("users").document(uid);
-      // 2: Delete the user document
+      // Delete the user document
       deleteDocument(userDoc);
     } catch (Exception e) {
       System.err.println("Error removing user : " + uid);
@@ -118,10 +122,8 @@ public class FirebaseUtilities implements StorageInterface {
   }
 
   // recursively removes all the documents and collections inside a collection
-  // https://firebase.google.com/docs/firestore/manage-data/delete-data#collections
   private void deleteCollection(CollectionReference collection) {
     try {
-
       // get all documents in the collection
       ApiFuture<QuerySnapshot> future = collection.get();
       List<QueryDocumentSnapshot> documents = future.get().getDocuments();
@@ -130,9 +132,6 @@ public class FirebaseUtilities implements StorageInterface {
       for (QueryDocumentSnapshot doc : documents) {
         doc.getReference().delete();
       }
-
-      // NOTE: the query to documents may be arbitrarily large. A more robust
-      // solution would involve batching the collection.get() call.
     } catch (Exception e) {
       System.err.println("Error deleting collection : " + e.getMessage());
     }
