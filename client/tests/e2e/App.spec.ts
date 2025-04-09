@@ -82,7 +82,6 @@ test("user can view redlining data overlay", async ({ page }) => {
   await expect(page.locator(".map")).toBeVisible();
 
   // Basic verification that the map has loaded with the expected structure
-  // We're just checking if the map container is present, as direct SVG testing is complex
   await expect(page.locator(".mapboxgl-canvas")).toBeVisible();
 });
 
@@ -253,7 +252,6 @@ test("multiple users can see each other's pins", async ({ page }) => {
   }
 
   // Check for user 1's pins (as other-pins)
-  // Note: With localStorage, these might not be visible
   const otherPinsVisibleToUser2 = await page.locator(".other-pin").count();
   console.log(`User 2 can see ${otherPinsVisibleToUser2} other-pins`);
 
