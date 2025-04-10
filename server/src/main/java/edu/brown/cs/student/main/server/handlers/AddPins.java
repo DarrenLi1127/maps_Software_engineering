@@ -7,36 +7,34 @@ import spark.Request;
 import spark.Response;
 import spark.Route;
 
-/** Handler for adding a pin to a user's map */
-public class AddPinHandler implements Route {
-  private final StorageInterface storageInterface;
+public class AddPins implements Route {
+  private final StorageInterface storage;
 
-  public AddPinHandler(StorageInterface storageInterface) {
-    this.storageInterface = storageInterface;
+  public AddPins(StorageInterface storage) {
+    this.storage = storage;
   }
 
   @Override
   public Object handle(Request request, Response response) {
-    response.type("application/json");
-    Map<String, Object> responseMap = new HashMap<>();
-
     try {
-      // Get parameters from the request
+      // Get parameters from request
       String userId = request.queryParams("userId");
       String pinId = request.queryParams("pinId");
       String latitude = request.queryParams("latitude");
       String longitude = request.queryParams("longitude");
       String timestamp = request.queryParams("timestamp");
 
-      // Validate parameters
+      // Validate required parameters
       if (userId == null
           || pinId == null
           || latitude == null
           || longitude == null
           || timestamp == null) {
-        responseMap.put("status", "error");
-        responseMap.put("message", "Missing required parameters");
-        return Utils.toMoshiJson(responseMap);
+        response.status(400);
+        Map<String, Object> errorResponse = new HashMap<>();
+        errorResponse.put("result", "error");
+        errorResponse.put("message", "Missing required parameters");
+        return Utils.toMoshiJson(errorResponse);
       }
 
       // Create pin data
@@ -47,17 +45,22 @@ public class AddPinHandler implements Route {
       pinData.put("userId", userId);
       pinData.put("timestamp", Long.parseLong(timestamp));
 
-      // Add pin to Firestore
-      storageInterface.addDocument(userId, "pins", pinId, pinData);
+      // Store in Firebase using simplified structure
+      storage.addDocument(userId, pinId, pinData);
 
       // Return success response
-      responseMap.put("status", "success");
-      responseMap.put("pin", pinData);
-      return Utils.toMoshiJson(responseMap);
+      Map<String, Object> successResponse = new HashMap<>();
+      successResponse.put("result", "success");
+      successResponse.put("pin", pinData);
+      return Utils.toMoshiJson(successResponse);
+
     } catch (Exception e) {
-      responseMap.put("status", "error");
-      responseMap.put("message", e.getMessage());
-      return Utils.toMoshiJson(responseMap);
+      e.printStackTrace();
+      response.status(500);
+      Map<String, Object> errorResponse = new HashMap<>();
+      errorResponse.put("result", "error");
+      errorResponse.put("message", e.getMessage());
+      return Utils.toMoshiJson(errorResponse);
     }
   }
 }

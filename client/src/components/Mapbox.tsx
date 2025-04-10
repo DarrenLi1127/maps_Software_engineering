@@ -9,7 +9,7 @@ import Map, {
   Popup
 } from "react-map-gl";
 import { geoLayer, overlayData } from "../utils/overlay";
-import { Pin, addPin, getAllPins, clearUserPins, loadPinsFromStorage } from "./pinType";
+import { Pin, addPin, getAllPins, clearUserPins} from "./pinType";
 import { useUser } from "@clerk/clerk-react";
 
 const MAPBOX_API_KEY = process.env.MAPBOX_TOKEN;
@@ -40,6 +40,9 @@ export default function Mapbox() {
   // State for pins
   const [pins, setPins] = useState<Pin[]>([]);
 
+  // Loading state
+  const [isLoading, setIsLoading] = useState(false);
+
   // State for selected pin (for popup)
   const [selectedPin, setSelectedPin] = useState<Pin | null>(null);
 
@@ -47,24 +50,54 @@ export default function Mapbox() {
   const { user } = useUser();
   const userId = user?.id || "anonymous";
 
-  // Fetch the overlay data and load pins from storage on component mount
+  // Fetch the overlay data and load pins from Firebase on component mount
   useEffect(() => {
     setOverlay(overlayData());
-    loadPinsFromStorage();
-    setPins(getAllPins());
+
+    // Fetch pins from server
+    const fetchPins = async () => {
+      setIsLoading(true);
+      try {
+        const serverPins = await getAllPins();
+        setPins(serverPins);
+        setIsLoading(false);
+      } catch (error) {
+        console.error("Error fetching pins from server:", error);
+        setIsLoading(false);
+      }
+    };
+
+    fetchPins();
   }, []);
 
-  const handleMapClick = (ev: MapLayerMouseEvent) => {
+  const handleMapClick = async (ev: MapLayerMouseEvent) => {
     if (!user) return; // Only logged in users can add pins
 
-    const newPin = addPin(ev.lngLat.lat, ev.lngLat.lng, userId);
-    setPins([...pins, newPin]);
+    try {
+      setIsLoading(true);
+      const newPin = await addPin(ev.lngLat.lat, ev.lngLat.lng, userId);
+      setPins([...pins, newPin]);
+      setIsLoading(false);
+    } catch (error) {
+      console.error("Error adding pin:", error);
+      setIsLoading(false);
+    }
   };
 
-  const handleClearMyPins = () => {
+  const handleClearMyPins = async () => {
     if (!user) return;
-    clearUserPins(userId);
-    setPins(getAllPins()); // Update the pins state
+
+    try {
+      setIsLoading(true);
+      await clearUserPins(userId);
+      // Refresh pins from server
+      const updatedPins = await getAllPins();
+      setPins(updatedPins);
+      setIsLoading(false);
+    } catch (error) {
+      console.error("Error clearing pins:", error);
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -74,8 +107,9 @@ export default function Mapbox() {
               onClick={handleClearMyPins}
               className="clear-pins-button"
               aria-label="Clear My Pins"
+              disabled={isLoading}
           >
-            Clear My Pins
+            {isLoading ? "Processing..." : "Clear My Pins"}
           </button>
         </div>
         <div className="map">
@@ -125,8 +159,16 @@ export default function Mapbox() {
                   <div>
                     <p>Negative landlord experience reported</p>
                     <p>Added {new Date(selectedPin.timestamp).toLocaleString()}</p>
+                    <p>By {selectedPin.userId === userId ? 'you' : 'another user'}</p>
                   </div>
                 </Popup>
+            )}
+
+            {/* Loading indicator */}
+            {isLoading && (
+                <div className="loading-overlay">
+                  <div className="loading-spinner">Loading...</div>
+                </div>
             )}
           </Map>
         </div>

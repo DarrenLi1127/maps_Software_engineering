@@ -1,7 +1,6 @@
 import { initializeApp } from "firebase/app";
 import "../styles/App.css";
 import MapsGearup from "./MapsGearup";
-import { useEffect } from "react";
 import {
   SignedIn,
   SignedOut,
@@ -9,7 +8,6 @@ import {
   SignOutButton,
   UserButton,
 } from "@clerk/clerk-react";
-import { loadPinsFromStorage } from "./pinType";
 
 const firebaseConfig = {
   apiKey: process.env.API_KEY,
@@ -23,10 +21,6 @@ const firebaseConfig = {
 initializeApp(firebaseConfig);
 
 function App() {
-  // Load pins from localStorage on app initialization
-  useEffect(() => {
-    loadPinsFromStorage();
-  }, []);
 
   return (
       <div className="App">

@@ -5,11 +5,10 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 public interface StorageInterface {
+  void addDocument(String userId, String pinId, Map<String, Object> data)
+      throws ExecutionException, InterruptedException;
 
-  void addDocument(String uid, String collection_id, String doc_id, Map<String, Object> data);
+  List<Map<String, Object>> getAllPins() throws ExecutionException, InterruptedException;
 
-  List<Map<String, Object>> getCollection(String uid, String collection_id)
-      throws InterruptedException, ExecutionException;
-
-  void clearUser(String uid) throws InterruptedException, ExecutionException;
+  void clearUser(String userId) throws ExecutionException, InterruptedException;
 }

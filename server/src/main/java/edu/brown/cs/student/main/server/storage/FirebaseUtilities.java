@@ -1,12 +1,9 @@
 package edu.brown.cs.student.main.server.storage;
 
-import com.google.api.core.ApiFuture;
 import com.google.auth.oauth2.GoogleCredentials;
-import com.google.cloud.firestore.CollectionReference;
 import com.google.cloud.firestore.DocumentReference;
 import com.google.cloud.firestore.Firestore;
 import com.google.cloud.firestore.QueryDocumentSnapshot;
-import com.google.cloud.firestore.QuerySnapshot;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
 import com.google.firebase.cloud.FirestoreClient;
@@ -17,123 +14,98 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
 public class FirebaseUtilities implements StorageInterface {
+  private Firestore firestore;
 
   public FirebaseUtilities() throws IOException {
-    // Create /resources/ folder with firebase_config.json and
-    // add your admin SDK from Firebase.
+    // Get the current working directory
     String workingDirectory = System.getProperty("user.dir");
+
+    // Create the path to the firebase config file
     Path firebaseConfigPath =
         Paths.get(workingDirectory, "src", "main", "resources", "firebase_config.json");
 
-    FileInputStream serviceAccount = new FileInputStream(firebaseConfigPath.toString());
-    GoogleCredentials credentials = GoogleCredentials.fromStream(serviceAccount);
+    System.out.println("Looking for Firebase config at: " + firebaseConfigPath.toString());
 
-    FirebaseOptions options =
-        new FirebaseOptions.Builder()
-            .setCredentials(credentials)
-            .setProjectId("maps-hli284")
-            .setDatabaseUrl("https://maps-hli284.firebaseio.com")
-            .build();
-
-    // Initialize Firebase if it's not already initialized
-    if (FirebaseApp.getApps().isEmpty()) {
-      FirebaseApp.initializeApp(options);
-    } else {
-      FirebaseApp.getInstance();
-    }
-  }
-
-  @Override
-  public List<Map<String, Object>> getCollection(String uid, String collection_id)
-      throws InterruptedException, ExecutionException, IllegalArgumentException {
-    if (uid == null || collection_id == null) {
-      throw new IllegalArgumentException("getCollection: uid and/or collection_id cannot be null");
-    }
-
-    // gets all documents in the collection 'collection_id' for user 'uid'
-
-    Firestore db = FirestoreClient.getFirestore();
-    // Make the data payload to add to your collection
-    CollectionReference dataRef = db.collection("users").document(uid).collection(collection_id);
-
-    // Get pin documents
-    QuerySnapshot dataQuery = dataRef.get().get();
-
-    // Get data from document queries
-    List<Map<String, Object>> data = new ArrayList<>();
-    for (QueryDocumentSnapshot doc : dataQuery.getDocuments()) {
-      data.add(doc.getData());
-    }
-
-    return data;
-  }
-
-  @Override
-  public void addDocument(String uid, String collection_id, String doc_id, Map<String, Object> data)
-      throws IllegalArgumentException {
-    if (uid == null || collection_id == null || doc_id == null || data == null) {
-      throw new IllegalArgumentException(
-          "addDocument: uid, collection_id, doc_id, or data cannot be null");
-    }
-    // adds a new document 'doc_id' to collection 'collection_id' for user 'uid'
-    // with data payload 'data'.
-
-    Firestore db = FirestoreClient.getFirestore();
-
-    // Get a reference to the collection
-    CollectionReference collectionRef =
-        db.collection("users").document(uid).collection(collection_id);
-
-    // Write data to the collection with the specified document ID
-    DocumentReference docRef = collectionRef.document(doc_id);
-    docRef.set(data);
-  }
-
-  // clears the collections inside of a specific user.
-  @Override
-  public void clearUser(String uid) throws IllegalArgumentException {
-    if (uid == null) {
-      throw new IllegalArgumentException("removeUser: uid cannot be null");
-    }
     try {
-      // removes all data for user 'uid'
-      Firestore db = FirestoreClient.getFirestore();
-      // Get a ref to the user document
-      DocumentReference userDoc = db.collection("users").document(uid);
-      // Delete the user document
-      deleteDocument(userDoc);
-    } catch (Exception e) {
-      System.err.println("Error removing user : " + uid);
-      System.err.println(e.getMessage());
-    }
-  }
+      // Initialize Firebase with credentials
+      FileInputStream serviceAccount = new FileInputStream(firebaseConfigPath.toFile());
 
-  private void deleteDocument(DocumentReference doc) {
-    // for each subcollection, run deleteCollection()
-    Iterable<CollectionReference> collections = doc.listCollections();
-    for (CollectionReference collection : collections) {
-      deleteCollection(collection);
-    }
-    // then delete the document
-    doc.delete();
-  }
+      FirebaseOptions options =
+          new FirebaseOptions.Builder()
+              .setCredentials(GoogleCredentials.fromStream(serviceAccount))
+              .build();
 
-  // recursively removes all the documents and collections inside a collection
-  private void deleteCollection(CollectionReference collection) {
-    try {
-      // get all documents in the collection
-      ApiFuture<QuerySnapshot> future = collection.get();
-      List<QueryDocumentSnapshot> documents = future.get().getDocuments();
-
-      // delete each document
-      for (QueryDocumentSnapshot doc : documents) {
-        doc.getReference().delete();
+      if (FirebaseApp.getApps().isEmpty()) {
+        FirebaseApp.initializeApp(options);
       }
-    } catch (Exception e) {
-      System.err.println("Error deleting collection : " + e.getMessage());
+
+      this.firestore = FirestoreClient.getFirestore();
+      System.out.println(
+          "Successfully initialized Firebase with config from: " + firebaseConfigPath.toString());
+
+    } catch (IOException e) {
+      System.err.println(
+          "Error: Could not find or load Firebase config from: " + firebaseConfigPath.toString());
+      System.err.println("Current working directory: " + workingDirectory);
+      throw e;
+    }
+  }
+
+  @Override
+  public void addDocument(String userId, String collectionName, Map<String, Object> data)
+      throws ExecutionException, InterruptedException {
+    // Generate a new document ID if not provided
+    String documentId =
+        data.containsKey("id")
+            ? (String) data.get("id")
+            : "pin_" + UUID.randomUUID().toString().replace("-", "");
+
+    // Store pins directly in a "pins" collection for simplified structure
+    DocumentReference docRef = firestore.collection("pins").document(documentId);
+
+    // Ensure userId is in the data
+    if (!data.containsKey("userId")) {
+      data.put("userId", userId);
+    }
+
+    // Ensure id is in the data
+    if (!data.containsKey("id")) {
+      data.put("id", documentId);
+    }
+
+    docRef.set(data).get();
+  }
+
+  @Override
+  public List<Map<String, Object>> getAllPins() throws ExecutionException, InterruptedException {
+    List<Map<String, Object>> allPins = new ArrayList<>();
+    List<QueryDocumentSnapshot> documents = firestore.collection("pins").get().get().getDocuments();
+
+    for (QueryDocumentSnapshot document : documents) {
+      Map<String, Object> pinData = document.getData();
+      // Ensure the ID is included in the data
+      if (!pinData.containsKey("id")) {
+        pinData.put("id", document.getId());
+      }
+      allPins.add(pinData);
+    }
+
+    return allPins;
+  }
+
+  @Override
+  public void clearUser(String userId) throws ExecutionException, InterruptedException {
+    // Get all pins for the user from the flattened structure
+    List<QueryDocumentSnapshot> documents =
+        firestore.collection("pins").whereEqualTo("userId", userId).get().get().getDocuments();
+
+    // Delete each document
+    for (QueryDocumentSnapshot document : documents) {
+      document.getReference().delete().get();
     }
   }
 }

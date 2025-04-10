@@ -14,13 +14,13 @@ export default defineConfig(({ mode }) => {
       "process.env.PROJECT_ID": JSON.stringify(env.PROJECT_ID),
       "process.env.STORAGE_BUCKET": JSON.stringify(env.STORAGE_BUCKET),
       "process.env.MESSAGING_SENDER_ID": JSON.stringify(
-        env.MESSAGING_SENDER_ID
+          env.MESSAGING_SENDER_ID
       ),
       "process.env.APP_ID": JSON.stringify(env.APP_ID),
       "process.env.MEASUREMENT_ID": JSON.stringify(env.MEASUREMENT_ID),
       "process.env.MAPBOX_TOKEN": JSON.stringify(env.MAPBOX_TOKEN),
       "process.env.VITE_CLERK_PUBLISHABLE_KEY": JSON.stringify(
-        env.VITE_CLERK_PUBLISHABLE_KEY
+          env.VITE_CLERK_PUBLISHABLE_KEY
       ),
     },
     plugins: [react()],
