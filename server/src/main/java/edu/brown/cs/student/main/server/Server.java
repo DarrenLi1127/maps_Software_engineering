@@ -1,63 +1,88 @@
 package edu.brown.cs.student.main.server;
 
-import static spark.Spark.after;
-
 import edu.brown.cs.student.main.server.handlers.AddPins;
 import edu.brown.cs.student.main.server.handlers.DropPins;
 import edu.brown.cs.student.main.server.handlers.GetAllPins;
+import edu.brown.cs.student.main.server.handlers.RedliningDataHandler;
 import edu.brown.cs.student.main.server.storage.FirebaseUtilities;
 import edu.brown.cs.student.main.server.storage.StorageInterface;
-import java.io.IOException;
-import spark.Filter;
 import spark.Spark;
 
-/** Top Level class for our project, utilizes spark to create and maintain our server. */
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
+/**
+ * Main server class that configures and starts the Spark server.
+ */
 public class Server {
-
-  public static void setUpServer() {
-    int port = 3232;
-    Spark.port(port);
-
-    after(
-        (Filter)
-            (request, response) -> {
-              response.header("Access-Control-Allow-Origin", "*");
-              response.header("Access-Control-Allow-Methods", "*");
-            });
-
-    StorageInterface firebaseUtils;
-    try {
-      firebaseUtils = new FirebaseUtilities();
-
-      // Set up endpoints for pin operations
-      Spark.get("add-pin", new AddPins(firebaseUtils));
-      Spark.get("get-all-pins", new GetAllPins(firebaseUtils));
-      Spark.get("drop-pins", new DropPins(firebaseUtils));
-
-      Spark.notFound(
-          (request, response) -> {
-            response.status(404); // Not Found
-            System.out.println("ERROR: Endpoint not found");
-            return "404 Not Found - The requested endpoint does not exist.";
-          });
-      Spark.init();
-      Spark.awaitInitialization();
-
-      System.out.println("Server started at http://localhost:" + port);
-    } catch (IOException e) {
-      e.printStackTrace();
-      System.err.println(
-          "Error: Could not initialize Firebase. Likely due to firebase_config.json not being found. Exiting.");
-      System.exit(1);
-    }
-  }
+  private static final int PORT = 3232;
 
   /**
-   * Runs Server.
+   * Main method to start the server.
    *
-   * @param args none
+   * @param args command line arguments (not used)
    */
   public static void main(String[] args) {
-    setUpServer();
+    try {
+      // Initialize Firebase storage
+      StorageInterface storage = new FirebaseUtilities();
+
+      // Get the path to the redlining dataset
+      String workingDirectory = System.getProperty("user.dir");
+      Path redliningFilePath = Paths.get(
+          workingDirectory,
+          "src",
+          "main",
+          "java",
+          "edu",
+          "brown",
+          "cs",
+          "student",
+          "main",
+          "server",
+          "geodata",
+          "fullDownload.json");
+
+      // Configure Spark
+      Spark.port(PORT);
+
+      // Set CORS headers
+      Spark.before((request, response) -> {
+        response.header("Access-Control-Allow-Origin", "*");
+        response.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+        response.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Content-Length, Accept, Origin");
+      });
+
+      // Handle OPTIONS requests for CORS preflight
+      Spark.options("/*", (request, response) -> {
+        String accessControlRequestHeaders = request.headers("Access-Control-Request-Headers");
+        if (accessControlRequestHeaders != null) {
+          response.header("Access-Control-Allow-Headers", accessControlRequestHeaders);
+        }
+
+        String accessControlRequestMethod = request.headers("Access-Control-Request-Method");
+        if (accessControlRequestMethod != null) {
+          response.header("Access-Control-Allow-Methods", accessControlRequestMethod);
+        }
+
+        return "OK";
+      });
+
+      // Register API endpoints
+      Spark.get("/add-pin", new AddPins(storage));
+      Spark.get("/get-all-pins", new GetAllPins(storage));
+      Spark.get("/drop-pins", new DropPins(storage));
+
+      // Register the new redlining data endpoint
+      Spark.get("/redlining-data", new RedliningDataHandler(redliningFilePath.toString()));
+
+      System.out.println("Server started on port " + PORT);
+
+    } catch (IOException e) {
+      System.err.println("Failed to initialize Firebase: " + e.getMessage());
+      e.printStackTrace();
+      System.exit(1);
+    }
   }
 }
