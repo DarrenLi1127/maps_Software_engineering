@@ -1,11 +1,15 @@
 package edu.brown.cs.student.main.server;
 
+import edu.brown.cs.student.main.server.geoJson.GeoJsonParser;
+import edu.brown.cs.student.main.server.geoJson.RedliningDataCache;
 import edu.brown.cs.student.main.server.handlers.AddPins;
 import edu.brown.cs.student.main.server.handlers.DropPins;
 import edu.brown.cs.student.main.server.handlers.GetAllPins;
+import edu.brown.cs.student.main.server.handlers.GetRedliningData;
 import edu.brown.cs.student.main.server.storage.FirebaseUtilities;
 import edu.brown.cs.student.main.server.storage.StorageInterface;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import spark.Spark;
@@ -24,22 +28,23 @@ public class Server {
       // Initialize Firebase storage
       StorageInterface storage = new FirebaseUtilities();
 
-      // Get the path to the redlining dataset
+      // Get the path to the redlining dataset in resources directory
       String workingDirectory = System.getProperty("user.dir");
       Path redliningFilePath =
-          Paths.get(
-              workingDirectory,
-              "src",
-              "main",
-              "java",
-              "edu",
-              "brown",
-              "cs",
-              "student",
-              "main",
-              "server",
-              "geodata",
-              "fullDownload.json");
+          Paths.get(workingDirectory, "src", "main", "resources", "fullDownload.json");
+
+      // Verify the file exists
+      if (!Files.exists(redliningFilePath)) {
+        System.err.println("WARNING: GeoJSON file not found at: " + redliningFilePath);
+        System.err.println("Please ensure the file exists at this location.");
+      } else {
+        System.out.println("GeoJSON file found at: " + redliningFilePath);
+      }
+
+      // Initialize GeoJSON parser and cache
+      System.out.println("Initializing GeoJSON parser with file: " + redliningFilePath);
+      GeoJsonParser geoJsonParser = new GeoJsonParser(redliningFilePath);
+      RedliningDataCache redliningCache = new RedliningDataCache();
 
       // Configure Spark
       Spark.port(PORT);
@@ -75,6 +80,9 @@ public class Server {
       Spark.get("/add-pin", new AddPins(storage));
       Spark.get("/get-all-pins", new GetAllPins(storage));
       Spark.get("/drop-pins", new DropPins(storage));
+
+      // Register new endpoint for redlining data
+      Spark.get("/get-redlining-data", new GetRedliningData(geoJsonParser, redliningCache));
 
       System.out.println("Server started on port " + PORT);
 
