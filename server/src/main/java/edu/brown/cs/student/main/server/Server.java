@@ -6,6 +6,7 @@ import edu.brown.cs.student.main.server.handlers.AddPins;
 import edu.brown.cs.student.main.server.handlers.DropPins;
 import edu.brown.cs.student.main.server.handlers.GetAllPins;
 import edu.brown.cs.student.main.server.handlers.GetRedliningData;
+import edu.brown.cs.student.main.server.handlers.SearchRedliningAreas;
 import edu.brown.cs.student.main.server.storage.FirebaseUtilities;
 import edu.brown.cs.student.main.server.storage.StorageInterface;
 import java.io.IOException;
@@ -80,9 +81,10 @@ public class Server {
       Spark.get("/add-pin", new AddPins(storage));
       Spark.get("/get-all-pins", new GetAllPins(storage));
       Spark.get("/drop-pins", new DropPins(storage));
-
-      // Register new endpoint for redlining data
       Spark.get("/get-redlining-data", new GetRedliningData(geoJsonParser, redliningCache));
+
+      // Register new search endpoint
+      Spark.get("/search-redlining", new SearchRedliningAreas(geoJsonParser));
 
       System.out.println("Server started on port " + PORT);
 

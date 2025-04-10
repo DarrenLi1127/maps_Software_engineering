@@ -9,7 +9,13 @@ import Map, {
   Popup,
   NavigationControl
 } from "react-map-gl";
-import { fetchRedliningData, geoLayer } from "../utils/overlay";
+import {
+  fetchRedliningData,
+  geoLayer,
+  highlightLayer,
+  searchRedliningAreas,
+  createHighlightedFeatureCollection
+} from "../utils/overlay";
 import { Pin, addPin, getAllPins, clearUserPins} from "./pinType";
 import { useUser } from "@clerk/clerk-react";
 
@@ -34,6 +40,15 @@ interface BoundingBoxInputs {
   minLng: string;
   maxLat: string;
   maxLng: string;
+}
+
+// Interface for detailed search results
+interface DetailedSearchResult {
+  id: string;
+  city: string;
+  name: string;
+  grade: string;
+  matchedField: string;
 }
 
 export default function Mapbox() {
@@ -70,17 +85,33 @@ export default function Mapbox() {
   // State for the current bounding box visualization
   const [boundingBox, setBoundingBox] = useState<GeoJSON.Feature | null>(null);
 
+  // States for search functionality
+  const [searchKeyword, setSearchKeyword] = useState<string>("");
+  const [searchResults, setSearchResults] = useState<string[]>([]);
+  const [highlightedFeatures, setHighlightedFeatures] = useState<GeoJSON.FeatureCollection | null>(null);
+  const [searchResultsCount, setSearchResultsCount] = useState<number | null>(null);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [detailedResults, setDetailedResults] = useState<DetailedSearchResult[]>([]);
+
+  // State for the selected result highlight
+  const [selectedResult, setSelectedResult] = useState<string | null>(null);
+
   // Get current user
   const { user } = useUser();
   const userId = user?.id || "anonymous";
 
-  // Handle input changes
+  // Handle input changes for bounding box
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setInputs(prev => ({
       ...prev,
       [name]: value
     }));
+  };
+
+  // Handle search keyword input change
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchKeyword(e.target.value);
   };
 
   // Fetch pins from the backend on component mount
@@ -120,6 +151,39 @@ export default function Mapbox() {
 
     fetchInitialData();
   }, []);
+
+  // Update highlighted features when search results or overlay data changes
+  useEffect(() => {
+    if (overlay && searchResults.length > 0) {
+      const highlighted = createHighlightedFeatureCollection(overlay, searchResults);
+      setHighlightedFeatures(highlighted);
+      setSearchResultsCount(highlighted.features.length);
+
+      // Create detailed search results from the features
+      const detailed = highlighted.features.map((feature, index) => {
+        const properties = feature.properties || {};
+        return {
+          id: searchResults[index] || `result-${index}`,
+          city: properties.city || "Unknown",
+          name: properties.name || "Unnamed Area",
+          grade: properties.holc_grade || "Unknown Grade",
+          matchedField: "area description" // Default value, actual matched field is not tracked in our current implementation
+        };
+      });
+
+      setDetailedResults(detailed);
+
+      // Show search results panel if there are results
+      if (detailed.length > 0) {
+        setShowSearchResults(true);
+      }
+    } else {
+      setHighlightedFeatures(null);
+      setSearchResultsCount(null);
+      setDetailedResults([]);
+      setShowSearchResults(false);
+    }
+  }, [searchResults, overlay]);
 
   // Apply the filter with the coordinates from the form
   const applyFilter = async (e?: React.FormEvent) => {
@@ -185,6 +249,82 @@ export default function Mapbox() {
     }
   };
 
+  // Perform search for keyword in area descriptions
+  const handleSearch = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+
+    if (!searchKeyword.trim()) {
+      alert("Please enter a search term");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+
+      // Search for the keyword
+      const results = await searchRedliningAreas(searchKeyword.trim());
+      setSearchResults(results);
+
+      if (results.length === 0) {
+        alert(`No results found for "${searchKeyword}"`);
+      }
+    } catch (error) {
+      console.error("Error searching area descriptions:", error);
+      alert("Error performing search. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Focus on a specific search result
+  const focusOnResult = (resultId: string) => {
+    // Find the feature in highlighted features
+    if (highlightedFeatures) {
+      const featureIndex = searchResults.findIndex(id => id === resultId);
+      if (featureIndex >= 0 && featureIndex < highlightedFeatures.features.length) {
+        const feature = highlightedFeatures.features[featureIndex];
+
+        // Get the center of the feature (simplified approach)
+        if (feature.geometry && feature.geometry.type === "MultiPolygon") {
+          // Find the center of the first polygon in the multipolygon
+          const coordinates = feature.geometry.coordinates[0][0]; // First polygon, outer ring
+          if (coordinates && coordinates.length > 0) {
+            // Calculate the average of all coordinates as a simple center
+            let sumLng = 0;
+            let sumLat = 0;
+            for (const coord of coordinates) {
+              sumLng += coord[0];
+              sumLat += coord[1];
+            }
+            const centerLng = sumLng / coordinates.length;
+            const centerLat = sumLat / coordinates.length;
+
+            // Fly to the center of the feature
+            setViewState({
+              longitude: centerLng,
+              latitude: centerLat,
+              zoom: 14 // Zoomed in enough to see the feature
+            });
+
+            // Set this as the selected result
+            setSelectedResult(resultId);
+          }
+        }
+      }
+    }
+  };
+
+  // Clear search results
+  const clearSearch = () => {
+    setSearchKeyword("");
+    setSearchResults([]);
+    setHighlightedFeatures(null);
+    setSearchResultsCount(null);
+    setShowSearchResults(false);
+    setDetailedResults([]);
+    setSelectedResult(null);
+  };
+
   // Calculate appropriate zoom level based on bounding box size
   const calculateZoomLevel = (minLat: number, minLng: number, maxLat: number, maxLng: number): number => {
     const latDiff = Math.abs(maxLat - minLat);
@@ -203,6 +343,7 @@ export default function Mapbox() {
   // Reset the view and clear any bounding box filters
   const resetView = async () => {
     setBoundingBox(null);
+    clearSearch();
 
     // Reset to default view
     setViewState({
@@ -275,6 +416,17 @@ export default function Mapbox() {
     },
   };
 
+  // Get the HOLC grade color
+  const getGradeColor = (grade: string) => {
+    switch(grade.toUpperCase()) {
+      case 'A': return '#5bcc04'; // Green
+      case 'B': return '#04b8cc'; // Blue
+      case 'C': return '#e9ed0e'; // Yellow
+      case 'D': return '#d11d1d'; // Red
+      default: return '#ccc';
+    }
+  };
+
   return (
       <div className="map-container">
         <div className="map-controls" style={{
@@ -282,7 +434,7 @@ export default function Mapbox() {
           backgroundColor: '#f8f8f8',
           borderBottom: '1px solid #ddd'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
             <div>
               <button
                   onClick={() => setShowForm(!showForm)}
@@ -303,7 +455,7 @@ export default function Mapbox() {
                 {showForm ? "Hide Filter Form" : "Filter by Coordinates"}
               </button>
 
-              {boundingBox && (
+              {(boundingBox || searchResults.length > 0) && (
                   <button
                       onClick={resetView}
                       style={{
@@ -354,12 +506,132 @@ export default function Mapbox() {
               marginLeft: '10px'
             }}>
               {overlay && overlay.features ? (
-                  <span>Showing {overlay.features.length} redlined areas</span>
+                  <span>
+                Showing {overlay.features.length} redlined areas
+                    {searchResultsCount !== null && (
+                        <span> | <strong>{searchResultsCount}</strong> matching search for "{searchKeyword}"</span>
+                    )}
+              </span>
               ) : (
                   <span>Loading redlining data...</span>
               )}
             </div>
           </div>
+
+          {/* Search input */}
+          <div style={{
+            marginBottom: '10px',
+            padding: '15px',
+            backgroundColor: 'white',
+            borderRadius: '4px',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+          }}>
+            <form onSubmit={handleSearch} style={{ display: 'flex', gap: '10px' }}>
+              <input
+                  type="text"
+                  value={searchKeyword}
+                  onChange={handleSearchChange}
+                  placeholder="Search area descriptions..."
+                  style={{
+                    padding: '8px',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    flexGrow: 1
+                  }}
+              />
+              <button
+                  type="submit"
+                  style={{
+                    backgroundColor: '#673AB7',
+                    color: 'white',
+                    border: 'none',
+                    padding: '8px 15px',
+                    textAlign: 'center',
+                    textDecoration: 'none',
+                    display: 'inline-block',
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    borderRadius: '4px'
+                  }}
+              >
+                Search
+              </button>
+              {searchResults.length > 0 && (
+                  <button
+                      type="button"
+                      onClick={clearSearch}
+                      style={{
+                        backgroundColor: '#F44336',
+                        color: 'white',
+                        border: 'none',
+                        padding: '8px 15px',
+                        textAlign: 'center',
+                        textDecoration: 'none',
+                        display: 'inline-block',
+                        fontSize: '14px',
+                        cursor: 'pointer',
+                        borderRadius: '4px'
+                      }}
+                  >
+                    Clear Search
+                  </button>
+              )}
+            </form>
+            <div style={{ marginTop: '8px', fontSize: '13px', color: '#666' }}>
+              <p>Search for keywords in area descriptions (e.g., "foreign", "mountain", "industrial", "italian" etc.)</p>
+            </div>
+          </div>
+
+          {/* Search Results Panel */}
+          {showSearchResults && detailedResults.length > 0 && (
+              <div style={{
+                marginBottom: '10px',
+                padding: '15px',
+                backgroundColor: 'white',
+                borderRadius: '4px',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                maxHeight: '200px',
+                overflowY: 'auto'
+              }}>
+                <h3 style={{ margin: '0 0 10px 0', fontSize: '16px' }}>
+                  Search Results for "{searchKeyword}" ({detailedResults.length})
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {detailedResults.map((result, index) => (
+                      <div
+                          key={`${result.id}-${index}`}
+                          onClick={() => focusOnResult(result.id)}
+                          style={{
+                            padding: '8px',
+                            border: `1px solid ${selectedResult === result.id ? '#FF4500' : '#ddd'}`,
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            backgroundColor: selectedResult === result.id ? 'rgba(255, 69, 0, 0.1)' : 'white',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                          }}
+                      >
+                        <div
+                            style={{
+                              width: '18px',
+                              height: '18px',
+                              backgroundColor: getGradeColor(result.grade),
+                              borderRadius: '50%',
+                              flexShrink: 0
+                            }}
+                        />
+                        <div>
+                          <div style={{ fontWeight: 'bold' }}>{result.name}</div>
+                          <div style={{ fontSize: '12px', color: '#666' }}>
+                            {result.city} • Grade {result.grade} • Contains "{searchKeyword}"
+                          </div>
+                        </div>
+                      </div>
+                  ))}
+                </div>
+              </div>
+          )}
 
           {/* Coordinate input form */}
           {showForm && (
@@ -479,7 +751,10 @@ export default function Mapbox() {
           <Map
               mapboxAccessToken={MAPBOX_API_KEY}
               {...viewState}
-              style={{ width: window.innerWidth, height: window.innerHeight - (showForm ? 220 : 100) }}
+              style={{
+                width: window.innerWidth,
+                height: window.innerHeight - (showForm ? 220 : (showSearchResults ? 280 : 160))
+              }}
               mapStyle="mapbox://styles/mapbox/streets-v12"
               onMove={(ev: ViewStateChangeEvent) => setViewState(ev.viewState)}
               onClick={handleMapClick}
@@ -491,6 +766,13 @@ export default function Mapbox() {
             {overlay && (
                 <Source id="geo_data" type="geojson" data={overlay}>
                   <Layer {...geoLayer} />
+                </Source>
+            )}
+
+            {/* Highlighted search results layer */}
+            {highlightedFeatures && highlightedFeatures.features.length > 0 && (
+                <Source id="highlight_data" type="geojson" data={highlightedFeatures}>
+                  <Layer {...highlightLayer} />
                 </Source>
             )}
 

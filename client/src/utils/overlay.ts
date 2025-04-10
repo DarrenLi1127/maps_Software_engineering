@@ -23,6 +23,16 @@ export const geoLayer: FillLayer = {
   },
 };
 
+// Layer for highlighted areas (for search results)
+export const highlightLayer: FillLayer = {
+  id: "highlight_data",
+  type: "fill",
+  paint: {
+    "fill-color": "#FF4500", // Orange-red highlight color
+    "fill-opacity": 0.6,
+  },
+};
+
 // API base URL - same as in pinType.ts
 const API_BASE_URL = "http://localhost:3232";
 
@@ -75,4 +85,72 @@ export async function fetchRedliningData(
     console.error("Error fetching redlining data:", error);
     return undefined;
   }
+}
+
+/**
+ * Search for areas containing the specified keyword in their descriptions
+ * @param keyword The search keyword
+ * @returns Array of matching feature IDs
+ */
+export async function searchRedliningAreas(keyword: string): Promise<string[]> {
+  try {
+    // Build the search URL with the keyword
+    const url = `${API_BASE_URL}/search-redlining?keyword=${encodeURIComponent(keyword)}`;
+
+    // Fetch search results from backend
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    if (data.result === "success") {
+      return data.matchingFeatures || [];
+    } else {
+      console.error("Search failed:", data.message);
+      return [];
+    }
+  } catch (error) {
+    console.error("Error searching redlining areas:", error);
+    return [];
+  }
+}
+
+/**
+ * Create a GeoJSON feature collection containing only the matching features
+ * @param allData The complete GeoJSON data
+ * @param matchingFeatureIds Array of feature IDs that match the search
+ * @returns GeoJSON feature collection with only matching features
+ */
+export function createHighlightedFeatureCollection(
+    allData: GeoJSON.FeatureCollection,
+    matchingFeatureIds: string[]
+): GeoJSON.FeatureCollection {
+  if (!allData || !allData.features || !matchingFeatureIds || matchingFeatureIds.length === 0) {
+    return {
+      type: "FeatureCollection",
+      features: []
+    };
+  }
+
+  // Create a feature collection with just the matching features
+  const highlightedFeatures: GeoJSON.Feature[] = allData.features
+  .filter((feature, index) => {
+    if (!feature.properties) return false;
+
+    // Create a similar ID to what we created in the backend
+    const featureId = (feature.properties.city || "") +
+        "-" + (feature.properties.holc_grade || "") +
+        "-" + index;
+
+    // Check if this feature's ID is in the matching IDs
+    return matchingFeatureIds.some(id => id === featureId);
+  });
+
+  return {
+    type: "FeatureCollection",
+    features: highlightedFeatures
+  };
 }
