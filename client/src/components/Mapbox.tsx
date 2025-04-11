@@ -404,7 +404,6 @@ export default function Mapbox() {
     },
   };
 
-  // Calculate map height - much more compact with dropdown results
   const mapHeight = showForm ? 'calc(100vh - 200px)' : 'calc(100vh - 130px)';
 
   return (

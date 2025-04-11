@@ -26,7 +26,6 @@ public class RedliningDataCache {
     this.maxSize = maxSize;
 
     // Create a LinkedHashMap with access-order
-    // (which moves entries to the end of the list when accessed)
     this.cache =
         new LinkedHashMap<String, String>(16, 0.75f, true) {
           @Override

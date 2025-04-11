@@ -10,10 +10,7 @@ import spark.Request;
 import spark.Response;
 import spark.Route;
 
-/**
- * Handler for the /search-redlining endpoint. Searches through redlining area descriptions for
- * keywords.
- */
+/** Handler for the /search-redlining endpoint. */
 public class SearchRedliningAreas implements Route {
   private final GeoJsonParser geoJsonParser;
 
@@ -64,7 +61,8 @@ public class SearchRedliningAreas implements Route {
 
           // Search in area_description_data map as per user story requirements
           if (feature.properties.area_description_data != null) {
-            for (Map.Entry<String, String> entry : feature.properties.area_description_data.entrySet()) {
+            for (Map.Entry<String, String> entry :
+                feature.properties.area_description_data.entrySet()) {
               String value = entry.getValue();
               if (value != null && value.toLowerCase().contains(keyword)) {
                 found = true;
@@ -73,14 +71,6 @@ public class SearchRedliningAreas implements Route {
             }
           }
 
-          // Also check the main area_description field if it exists
-          if (!found && feature.properties.area_description != null) {
-            if (feature.properties.area_description.toLowerCase().contains(keyword)) {
-              found = true;
-            }
-          }
-
-          // If we found the keyword, add this feature's identifier to the list
           if (found) {
             // Create a unique identifier for this feature (combining city and holc_grade)
             String featureId =

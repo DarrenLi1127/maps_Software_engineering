@@ -64,7 +64,7 @@ public class FirebaseUtilities implements StorageInterface {
             ? (String) data.get("id")
             : "pin_" + UUID.randomUUID().toString().replace("-", "");
 
-    // Store pins directly in a "pins" collection for simplified structure
+    // Store pins directly in a "pins" collection
     DocumentReference docRef = firestore.collection("pins").document(documentId);
 
     // Ensure userId is in the data
