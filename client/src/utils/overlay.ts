@@ -135,22 +135,41 @@ export function createHighlightedFeatureCollection(
     };
   }
 
-  // Create a feature collection with just the matching features
-  const highlightedFeatures: GeoJSON.Feature[] = allData.features
-  .filter((feature, index) => {
-    if (!feature.properties) return false;
+  // Create a tracking map to keep track of which features we've already matched
+  // This helps prevent duplicate matches
+  const matchedFeatures = new Set<number>();
+  const resultFeatures: GeoJSON.Feature[] = [];
 
-    // Create a similar ID to what we created in the backend
-    const featureId = (feature.properties.city || "") +
-        "-" + (feature.properties.holc_grade || "") +
-        "-" + index;
+  // Go through each matchingFeatureId from the backend
+  for (const featureId of matchingFeatureIds) {
+    const parts = featureId.split('-');
+    const city = parts[0] || "";
+    const grade = parts[1] || "";
+    const index = parts.length > 2 ? parseInt(parts[2]) : -1;
 
-    // Check if this feature's ID is in the matching IDs
-    return matchingFeatureIds.some(id => id === featureId);
-  });
+    // Find the first matching feature that hasn't been matched yet
+    for (let i = 0; i < allData.features.length; i++) {
+      if (matchedFeatures.has(i)) continue; // Skip already matched features
+
+      const feature = allData.features[i];
+      if (!feature.properties) continue;
+
+      const featureCity = feature.properties.city || "";
+      const featureGrade = feature.properties.holc_grade || "";
+
+      // Check if this feature matches the city and grade
+      if (featureCity === city && featureGrade === grade) {
+        matchedFeatures.add(i);
+        resultFeatures.push(feature);
+        break; // Only match one feature per ID
+      }
+    }
+  }
+
+  console.log(`Found ${resultFeatures.length} matching features for ${matchingFeatureIds.length} IDs`);
 
   return {
     type: "FeatureCollection",
-    features: highlightedFeatures
+    features: resultFeatures
   };
 }

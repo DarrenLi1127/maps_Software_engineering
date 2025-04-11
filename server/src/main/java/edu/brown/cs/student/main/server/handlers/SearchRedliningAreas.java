@@ -59,16 +59,24 @@ public class SearchRedliningAreas implements Route {
       List<String> matchingFeatureIds = new ArrayList<>();
 
       for (GeoJsonObject.Feature feature : allData.features) {
-        if (feature.properties != null && feature.properties.area_description_data != null) {
-          // Check each key-value pair in the area_description_data map
+        if (feature.properties != null) {
           boolean found = false;
 
-          for (Map.Entry<String, String> entry :
-              feature.properties.area_description_data.entrySet()) {
-            String value = entry.getValue();
-            if (value != null && value.toLowerCase().contains(keyword)) {
+          // Search in area_description_data map as per user story requirements
+          if (feature.properties.area_description_data != null) {
+            for (Map.Entry<String, String> entry : feature.properties.area_description_data.entrySet()) {
+              String value = entry.getValue();
+              if (value != null && value.toLowerCase().contains(keyword)) {
+                found = true;
+                break;
+              }
+            }
+          }
+
+          // Also check the main area_description field if it exists
+          if (!found && feature.properties.area_description != null) {
+            if (feature.properties.area_description.toLowerCase().contains(keyword)) {
               found = true;
-              break;
             }
           }
 

@@ -18,6 +18,9 @@ import {
 } from "../utils/overlay";
 import { Pin, addPin, getAllPins, clearUserPins} from "./pinType";
 import { useUser } from "@clerk/clerk-react";
+import MapControls from "./MapControls";
+import { MapUtils } from "./MapUtils";
+import "../styles/Map.css";
 
 const MAPBOX_API_KEY = process.env.MAPBOX_TOKEN;
 if (!MAPBOX_API_KEY) {
@@ -35,7 +38,7 @@ const ProvidenceLatLong: LatLong = {
 const initialZoom = 12;
 
 // Input fields for the bounding box
-interface BoundingBoxInputs {
+export interface BoundingBoxInputs {
   minLat: string;
   minLng: string;
   maxLat: string;
@@ -43,7 +46,7 @@ interface BoundingBoxInputs {
 }
 
 // Interface for detailed search results
-interface DetailedSearchResult {
+export interface DetailedSearchResult {
   id: string;
   city: string;
   name: string;
@@ -100,20 +103,6 @@ export default function Mapbox() {
   const { user } = useUser();
   const userId = user?.id || "anonymous";
 
-  // Handle input changes for bounding box
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setInputs(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  // Handle search keyword input change
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchKeyword(e.target.value);
-  };
-
   // Fetch pins from the backend on component mount
   useEffect(() => {
     const fetchPins = async () => {
@@ -165,9 +154,9 @@ export default function Mapbox() {
         return {
           id: searchResults[index] || `result-${index}`,
           city: properties.city || "Unknown",
-          name: properties.name || "Unnamed Area",
+          name: properties.name || `Area ${index}`,
           grade: properties.holc_grade || "Unknown Grade",
-          matchedField: "area description" // Default value, actual matched field is not tracked in our current implementation
+          matchedField: "area description"
         };
       });
 
@@ -237,7 +226,7 @@ export default function Mapbox() {
       setViewState({
         longitude: (minLng + maxLng) / 2,
         latitude: (minLat + maxLat) / 2,
-        zoom: Math.min(12, calculateZoomLevel(minLat, minLng, maxLat, maxLng))
+        zoom: Math.min(12, MapUtils.calculateZoomLevel(minLat, minLng, maxLat, maxLng))
       });
 
       // Hide the form after applying
@@ -325,21 +314,6 @@ export default function Mapbox() {
     setSelectedResult(null);
   };
 
-  // Calculate appropriate zoom level based on bounding box size
-  const calculateZoomLevel = (minLat: number, minLng: number, maxLat: number, maxLng: number): number => {
-    const latDiff = Math.abs(maxLat - minLat);
-    const lngDiff = Math.abs(maxLng - minLng);
-    const maxDiff = Math.max(latDiff, lngDiff);
-
-    // Rough estimation - adjust as needed
-    if (maxDiff > 5) return 5;
-    if (maxDiff > 2) return 7;
-    if (maxDiff > 1) return 9;
-    if (maxDiff > 0.5) return 10;
-    if (maxDiff > 0.1) return 12;
-    return 14;
-  };
-
   // Reset the view and clear any bounding box filters
   const resetView = async () => {
     setBoundingBox(null);
@@ -394,6 +368,20 @@ export default function Mapbox() {
     }
   };
 
+  // Handle input changes for bounding box
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setInputs(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  // Handle search keyword input change
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchKeyword(e.target.value);
+  };
+
   // Layer for the bounding box
   // @ts-ignore
   const boundingBoxLayer: Layer = {
@@ -416,344 +404,41 @@ export default function Mapbox() {
     },
   };
 
-  // Get the HOLC grade color
-  const getGradeColor = (grade: string) => {
-    switch(grade.toUpperCase()) {
-      case 'A': return '#5bcc04'; // Green
-      case 'B': return '#04b8cc'; // Blue
-      case 'C': return '#e9ed0e'; // Yellow
-      case 'D': return '#d11d1d'; // Red
-      default: return '#ccc';
-    }
-  };
+  // Calculate map height - much more compact with dropdown results
+  const mapHeight = showForm ? 'calc(100vh - 200px)' : 'calc(100vh - 130px)';
 
   return (
       <div className="map-container">
-        <div className="map-controls" style={{
-          padding: '10px',
-          backgroundColor: '#f8f8f8',
-          borderBottom: '1px solid #ddd'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-            <div>
-              <button
-                  onClick={() => setShowForm(!showForm)}
-                  style={{
-                    backgroundColor: '#4CAF50',
-                    color: 'white',
-                    border: 'none',
-                    padding: '10px 15px',
-                    textAlign: 'center',
-                    textDecoration: 'none',
-                    display: 'inline-block',
-                    fontSize: '14px',
-                    margin: '4px 2px',
-                    cursor: 'pointer',
-                    borderRadius: '4px'
-                  }}
-              >
-                {showForm ? "Hide Filter Form" : "Filter by Coordinates"}
-              </button>
-
-              {(boundingBox || searchResults.length > 0) && (
-                  <button
-                      onClick={resetView}
-                      style={{
-                        backgroundColor: '#2196F3',
-                        color: 'white',
-                        border: 'none',
-                        padding: '10px 15px',
-                        textAlign: 'center',
-                        textDecoration: 'none',
-                        display: 'inline-block',
-                        fontSize: '14px',
-                        margin: '4px 2px',
-                        cursor: 'pointer',
-                        borderRadius: '4px'
-                      }}
-                  >
-                    Reset View
-                  </button>
-              )}
-
-              <button
-                  onClick={handleClearMyPins}
-                  disabled={isLoading}
-                  style={{
-                    backgroundColor: '#ff9800',
-                    color: 'white',
-                    border: 'none',
-                    padding: '10px 15px',
-                    textAlign: 'center',
-                    textDecoration: 'none',
-                    display: 'inline-block',
-                    fontSize: '14px',
-                    margin: '4px 2px',
-                    cursor: 'pointer',
-                    borderRadius: '4px',
-                    opacity: isLoading ? 0.7 : 1
-                  }}
-              >
-                {isLoading ? "Processing..." : "Clear My Pins"}
-              </button>
-            </div>
-
-            <div className="info-box" style={{
-              padding: '10px',
-              backgroundColor: 'white',
-              borderRadius: '4px',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              marginLeft: '10px'
-            }}>
-              {overlay && overlay.features ? (
-                  <span>
-                Showing {overlay.features.length} redlined areas
-                    {searchResultsCount !== null && (
-                        <span> | <strong>{searchResultsCount}</strong> matching search for "{searchKeyword}"</span>
-                    )}
-              </span>
-              ) : (
-                  <span>Loading redlining data...</span>
-              )}
-            </div>
-          </div>
-
-          {/* Search input */}
-          <div style={{
-            marginBottom: '10px',
-            padding: '15px',
-            backgroundColor: 'white',
-            borderRadius: '4px',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-          }}>
-            <form onSubmit={handleSearch} style={{ display: 'flex', gap: '10px' }}>
-              <input
-                  type="text"
-                  value={searchKeyword}
-                  onChange={handleSearchChange}
-                  placeholder="Search area descriptions..."
-                  style={{
-                    padding: '8px',
-                    border: '1px solid #ddd',
-                    borderRadius: '4px',
-                    flexGrow: 1
-                  }}
-              />
-              <button
-                  type="submit"
-                  style={{
-                    backgroundColor: '#673AB7',
-                    color: 'white',
-                    border: 'none',
-                    padding: '8px 15px',
-                    textAlign: 'center',
-                    textDecoration: 'none',
-                    display: 'inline-block',
-                    fontSize: '14px',
-                    cursor: 'pointer',
-                    borderRadius: '4px'
-                  }}
-              >
-                Search
-              </button>
-              {searchResults.length > 0 && (
-                  <button
-                      type="button"
-                      onClick={clearSearch}
-                      style={{
-                        backgroundColor: '#F44336',
-                        color: 'white',
-                        border: 'none',
-                        padding: '8px 15px',
-                        textAlign: 'center',
-                        textDecoration: 'none',
-                        display: 'inline-block',
-                        fontSize: '14px',
-                        cursor: 'pointer',
-                        borderRadius: '4px'
-                      }}
-                  >
-                    Clear Search
-                  </button>
-              )}
-            </form>
-            <div style={{ marginTop: '8px', fontSize: '13px', color: '#666' }}>
-              <p>Search for keywords in area descriptions (e.g., "foreign", "mountain", "industrial", "italian" etc.)</p>
-            </div>
-          </div>
-
-          {/* Search Results Panel */}
-          {showSearchResults && detailedResults.length > 0 && (
-              <div style={{
-                marginBottom: '10px',
-                padding: '15px',
-                backgroundColor: 'white',
-                borderRadius: '4px',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                maxHeight: '200px',
-                overflowY: 'auto'
-              }}>
-                <h3 style={{ margin: '0 0 10px 0', fontSize: '16px' }}>
-                  Search Results for "{searchKeyword}" ({detailedResults.length})
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {detailedResults.map((result, index) => (
-                      <div
-                          key={`${result.id}-${index}`}
-                          onClick={() => focusOnResult(result.id)}
-                          style={{
-                            padding: '8px',
-                            border: `1px solid ${selectedResult === result.id ? '#FF4500' : '#ddd'}`,
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            backgroundColor: selectedResult === result.id ? 'rgba(255, 69, 0, 0.1)' : 'white',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                          }}
-                      >
-                        <div
-                            style={{
-                              width: '18px',
-                              height: '18px',
-                              backgroundColor: getGradeColor(result.grade),
-                              borderRadius: '50%',
-                              flexShrink: 0
-                            }}
-                        />
-                        <div>
-                          <div style={{ fontWeight: 'bold' }}>{result.name}</div>
-                          <div style={{ fontSize: '12px', color: '#666' }}>
-                            {result.city} • Grade {result.grade} • Contains "{searchKeyword}"
-                          </div>
-                        </div>
-                      </div>
-                  ))}
-                </div>
-              </div>
-          )}
-
-          {/* Coordinate input form */}
-          {showForm && (
-              <form
-                  onSubmit={applyFilter}
-                  style={{
-                    marginTop: '10px',
-                    padding: '15px',
-                    backgroundColor: 'white',
-                    borderRadius: '4px',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                  }}
-              >
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '5px', fontSize: '14px' }}>
-                      Min Latitude:
-                    </label>
-                    <input
-                        type="text"
-                        name="minLat"
-                        value={inputs.minLat}
-                        onChange={handleInputChange}
-                        style={{
-                          padding: '8px',
-                          border: '1px solid #ddd',
-                          borderRadius: '4px',
-                          width: '120px'
-                        }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '5px', fontSize: '14px' }}>
-                      Min Longitude:
-                    </label>
-                    <input
-                        type="text"
-                        name="minLng"
-                        value={inputs.minLng}
-                        onChange={handleInputChange}
-                        style={{
-                          padding: '8px',
-                          border: '1px solid #ddd',
-                          borderRadius: '4px',
-                          width: '120px'
-                        }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '5px', fontSize: '14px' }}>
-                      Max Latitude:
-                    </label>
-                    <input
-                        type="text"
-                        name="maxLat"
-                        value={inputs.maxLat}
-                        onChange={handleInputChange}
-                        style={{
-                          padding: '8px',
-                          border: '1px solid #ddd',
-                          borderRadius: '4px',
-                          width: '120px'
-                        }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '5px', fontSize: '14px' }}>
-                      Max Longitude:
-                    </label>
-                    <input
-                        type="text"
-                        name="maxLng"
-                        value={inputs.maxLng}
-                        onChange={handleInputChange}
-                        style={{
-                          padding: '8px',
-                          border: '1px solid #ddd',
-                          borderRadius: '4px',
-                          width: '120px'
-                        }}
-                    />
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-                    <button
-                        type="submit"
-                        style={{
-                          backgroundColor: '#4CAF50',
-                          color: 'white',
-                          border: 'none',
-                          padding: '8px 15px',
-                          textAlign: 'center',
-                          textDecoration: 'none',
-                          display: 'inline-block',
-                          fontSize: '14px',
-                          cursor: 'pointer',
-                          borderRadius: '4px',
-                          height: '35px'
-                        }}
-                    >
-                      Apply Filter
-                    </button>
-                  </div>
-                </div>
-
-                <div style={{ marginTop: '10px', fontSize: '13px', color: '#666' }}>
-                  <p>Enter the latitude and longitude values to define a bounding box. For Providence area, try the defaults.</p>
-                </div>
-              </form>
-          )}
-        </div>
+        <MapControls
+            showForm={showForm}
+            setShowForm={setShowForm}
+            boundingBox={boundingBox}
+            searchResults={searchResults}
+            resetView={resetView}
+            handleClearMyPins={handleClearMyPins}
+            isLoading={isLoading}
+            overlay={overlay}
+            searchResultsCount={searchResultsCount}
+            searchKeyword={searchKeyword}
+            handleSearchChange={handleSearchChange}
+            handleSearch={handleSearch}
+            clearSearch={clearSearch}
+            showSearchResults={showSearchResults}
+            detailedResults={detailedResults}
+            selectedResult={selectedResult}
+            focusOnResult={focusOnResult}
+            inputs={inputs}
+            handleInputChange={handleInputChange}
+            applyFilter={applyFilter}
+        />
 
         <div className="map">
           <Map
               mapboxAccessToken={MAPBOX_API_KEY}
               {...viewState}
               style={{
-                width: window.innerWidth,
-                height: window.innerHeight - (showForm ? 220 : (showSearchResults ? 280 : 160))
+                width: "100%",
+                height: mapHeight
               }}
               mapStyle="mapbox://styles/mapbox/streets-v12"
               onMove={(ev: ViewStateChangeEvent) => setViewState(ev.viewState)}
@@ -799,7 +484,6 @@ export default function Mapbox() {
                   <div
                       className={`map-pin ${pin.userId === userId ? 'my-pin' : 'other-pin'}`}
                       aria-label={`Pin at latitude ${pin.latitude}, longitude ${pin.longitude}`}
-                      style={{ fontSize: '24px' }}
                   >
                     📍
                   </div>
@@ -813,8 +497,9 @@ export default function Mapbox() {
                     latitude={selectedPin.latitude}
                     anchor="top"
                     onClose={() => setSelectedPin(null)}
+                    className="map-popup"
                 >
-                  <div>
+                  <div className="popup-content">
                     <p>Negative landlord experience reported</p>
                     <p>Added {new Date(selectedPin.timestamp).toLocaleString()}</p>
                     <p>By {selectedPin.userId === userId ? 'you' : 'another user'}</p>
@@ -824,24 +509,8 @@ export default function Mapbox() {
 
             {/* Loading indicator */}
             {isLoading && (
-                <div className="loading-overlay" style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  backgroundColor: 'rgba(255, 255, 255, 0.5)',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  zIndex: 1000
-                }}>
-                  <div className="loading-spinner" style={{
-                    padding: '20px',
-                    backgroundColor: 'white',
-                    borderRadius: '8px',
-                    boxShadow: '0 4px 8px rgba(0,0,0,0.1)'
-                  }}>
+                <div className="loading-overlay">
+                  <div className="loading-spinner">
                     Loading...
                   </div>
                 </div>
