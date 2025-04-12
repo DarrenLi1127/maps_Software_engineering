@@ -1,3 +1,7 @@
+/**
+ * This file was adjusted with assistance of Claude 3.7 Sonnet (Anthropic, 2025).
+ */
+
 import React from 'react';
 import { BoundingBoxInputs, DetailedSearchResult } from './Mapbox';
 import { MapUtils } from './MapUtils';

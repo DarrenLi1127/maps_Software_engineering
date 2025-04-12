@@ -1,3 +1,7 @@
+/**
+ * This file was adjusted with assistance of Claude 3.7 Sonnet (Anthropic, 2025).
+ */
+
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useEffect, useState, useRef } from "react";
 import Map, {
