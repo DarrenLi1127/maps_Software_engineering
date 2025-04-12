@@ -1,3 +1,7 @@
+/**
+ * This file was adjusted with assistance of Claude 3.7 Sonnet (Anthropic, 2025).
+ */
+
 package edu.brown.cs.student.main;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
